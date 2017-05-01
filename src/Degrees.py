@@ -50,3 +50,31 @@ class Degrees:
             print("total weighted degree completed")
 #             ut.printRDD(output_rdd)
             return output_rdd
+
+
+    def deg_vs_count(self, total_degree_rdd):
+        output_rdd = total_degree_rdd.map(lambda x:(x[1], x[0])).groupByKey().map(lambda x: (x[0], len(x[1])))
+        return output_rdd
+    
+    
+    '''
+    binCenter returns the center of bin given boundary of bin
+    binBoundary: array([double])
+    centers: array([double])
+    '''
+    def bin_center(self,binBoundary):
+        length = len(binBoundary)
+        centers = [0] * (length-1)
+        for idx in range(len(centers)):
+            centers[idx] = binBoundary[idx] + (binBoundary[idx+1] - binBoundary[idx])/2.0
+
+        return centers
+
+    def deg_vs_count_weight(self, totalDegree, binNum):
+        deg = totalDegree.map(lambda x:x[1])
+        histList = deg.histogram(binNum)
+        centers = self.bin_center(histList[0])
+        return [centers, histList[1]]
+            
+            
+            

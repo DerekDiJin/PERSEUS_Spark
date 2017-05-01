@@ -28,6 +28,11 @@ class Configurations:
         
         self._pr = 1  # default: 1
         
+        # bivariate distribution, total
+        self._totaldeg_vs_count = 1 # default: 1
+        self._pr_vs_count = 1 # default: 1
+        self._totaldeg_vs_pr = 1 # default: 1
+        
     def getDebug(self):
         return self._debug
     
@@ -46,4 +51,12 @@ class Configurations:
     def getPR(self):
         return self._pr
         
+    def getTotalDeg_vs_Count(self):
+        return self._totaldeg_vs_count
+
+    def getPR_vs_Count(self):
+        return self._pr_vs_count
+
+    def getTotalDeg_vs_PR(self):
+        return self._totaldeg_vs_pr
         

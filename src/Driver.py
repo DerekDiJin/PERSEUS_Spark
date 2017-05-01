@@ -146,6 +146,14 @@ if __name__ == '__main__':
             temp = output_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree')
             
+        if graph_statistics.getTotalDeg_vs_Count():
+            output_rdd = deg.statistics_compute(D, 'total')
+            deg_vs_count_rdd = deg.deg_vs_count(output_rdd)
+            
+            # generate outputs to hdfs
+            temp = deg_vs_count_rdd.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'deg_vs_count')
+            
         '''
         PageRank
         '''       
@@ -157,7 +165,27 @@ if __name__ == '__main__':
             # generate outputs to hdfs
             temp = output_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank')
+            
+        if graph_statistics.getPR_vs_Count():
+            pr_rdd = pr.statistics_compute(D, 19, 0.85, debug_mod)
+            [centers, counts] = pr.pr_vs_count(output_rdd, 1000)
+            centers = sc.parallelize(centers)
+            counts = sc.parallelize(counts)
+            pr_vs_count = centers.zip(counts)
       
+            # generate outputs to hdfs
+            temp = pr_vs_count.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'pr_vs_count')
+            
+        if graph_statistics.getTotalDeg_vs_PR():
+            total_degree_rdd = deg.statistics_compute(D, 'total')
+            pr_rdd = pr.statistics_compute(D, 19, 0.85, debug_mod)
+            total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
+            
+            temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'total_degree_vs_pr')
+            
+            
 
     elif graph_statistics.isWeighted() == 1:
         '''
@@ -186,6 +214,16 @@ if __name__ == '__main__':
             # generate outputs to hdfs
             temp = output_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_weighted')
+            
+        if graph_statistics.getTotalDeg_vs_Count():
+            [centers, counts] = deg.deg_vs_count_weight(output_rdd, 1000)
+            centers = sc.parallelize(centers)
+            counts = sc.parallelize(counts)
+            total_degree_vs_count_weighted_rdd = centers.zip(counts)
+            
+            # generate outputs to hdfs
+            temp = total_degree_vs_count_weighted_rdd.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'total_degree_vs_count_weighted')
    
         '''
         PageRank
@@ -198,6 +236,28 @@ if __name__ == '__main__':
             # generate outputs to hdfs
             temp = output_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank_weighted')
+            
+        
+        if graph_statistics.getPR_vs_Count():
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            [centers, counts] = pr.pr_vs_count(output_rdd, 1000)
+            centers = sc.parallelize(centers)
+            counts = sc.parallelize(counts)
+            pr_vs_count = centers.zip(counts)
+      
+            # generate outputs to hdfs
+            temp = pr_vs_count.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'pr_vs_count_weighted')
+        
+        
+        if graph_statistics.getTotalDeg_vs_PR():
+            total_degree_rdd = deg.statistics_compute(D, 'total')
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
+            
+            temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
+            
     
 #      
 #     Edges_rdd = sc.parallelize(Edges)

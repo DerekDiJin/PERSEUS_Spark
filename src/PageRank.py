@@ -93,5 +93,24 @@ class PageRank:
             if debug_mod == 1:
                 ut.printRDD(ranks)
         return ranks
+    
+    '''
+    binCenter returns the center of bin given boundary of bin
+    binBoundary: array([double])
+    centers: array([double])
+    '''
+    def binCenter(self,binBoundary):
+        length = len(binBoundary)
+        centers = [0] * (length-1)
+        for idx in range(len(centers)):
+            centers[idx] = binBoundary[idx] + (binBoundary[idx+1] - binBoundary[idx])/2.0
+
+        return centers
+
+    def pr_vs_count(self, pr, binNum):
+        pr = pr.map(lambda x: x[1])
+        histList = pr.histogram(binNum)
+        centers = self.binCenter(histList[0])
+        return [centers, histList[1]]
         
         
