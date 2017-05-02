@@ -20,10 +20,10 @@ class Configurations:
     def __init__(self):
 #         parser = argparse.ArgumentParser()
 
-        self._debug = 1 # default: 0
+        self._debug = 0 # default: 0
         self._weighted = 0 # default: 0
-        self._deg_in = 0  # default: 1
-        self._deg_out = 0  # default: 1
+        self._deg_in = 1  # default: 1
+        self._deg_out = 1  # default: 1
         self._deg_total = 0  # default: 0
         
         self._pr = 1  # default: 1

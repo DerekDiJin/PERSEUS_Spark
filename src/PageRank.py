@@ -47,6 +47,9 @@ class PageRank:
         print(max_src, max_dst)
         
         N = float(max(max_src, max_dst))
+        src_nodes = D.map(lambda x: (x[0], 0)).distinct()
+        dst_nodes = D.map(lambda x: (x[1], 0)).distinct()
+        src_only = src_nodes.subtractByKey(dst_nodes).cache()
         
         ranks = D.map(lambda line: line[0]).union(D.map(lambda line: line[1])).distinct().map(lambda line: (line, 1/N)).cache()
         
@@ -55,16 +58,17 @@ class PageRank:
                 print(iter)
                 ut.printRDD(D)
             contribs = D.groupByKey().join(ranks).flatMap( lambda url_urls_rank: self.computeContribs(url_urls_rank[1][0], url_urls_rank[1][1]) )
-            
+            contribs = contribs.union(src_only)
+
             if debug_mod == 1:
                 ut.printRDD(contribs)
-                
+
             ranks = contribs.reduceByKey(add).mapValues(lambda rank: rank * d + (1-d)/N)
 #             ranks = ranks.leftOuterJoin(ranks_u).map(lambda line: (line[0], line[1][0] if line[1][1] is None else line[1][1]))
             
             if debug_mod == 1:
                 ut.printRDD(ranks)
-        return ranks
+        return ranks.sortByKey()
 #         for (link, rank) in ranks.collect():
 #             print("%s has rank: %s." % (link, rank))
 
@@ -73,6 +77,9 @@ class PageRank:
         print(max_src, max_dst)
         
         N = float(max(max_src, max_dst))
+        src_nodes = D.map(lambda x: (x[0], 0)).distinct()
+        dst_nodes = D.map(lambda x: (x[1], 0)).distinct()
+        src_only = src_nodes.subtractByKey(dst_nodes).cache()
         
         ranks = D.map(lambda line: line[0]).union(D.map(lambda line: line[1])).distinct().map(lambda line: (line, 1/N)).cache()
         
@@ -82,7 +89,8 @@ class PageRank:
             if debug_mod == 1:
                 print(iter)
                 ut.printRDD(D)
-            contribs = D.groupByKey().join(ranks).flatMap( lambda url_urls_rank: self.computeContribs_weighted(url_urls_rank[1][0], url_urls_rank[1][1]) )
+            contribs = D.groupByKey().join(ranks).flatMap(lambda url_urls_rank: self.computeContribs_weighted(url_urls_rank[1][0], url_urls_rank[1][1]))
+            contribs = contribs.union(src_only)
             
             if debug_mod == 1:
                 ut.printRDD(contribs)
@@ -92,8 +100,8 @@ class PageRank:
             
             if debug_mod == 1:
                 ut.printRDD(ranks)
-        return ranks
-    
+        return ranks.sortByKey()
+
     '''
     binCenter returns the center of bin given boundary of bin
     binBoundary: array([double])
