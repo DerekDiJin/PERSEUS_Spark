@@ -73,6 +73,7 @@ if __name__ == '__main__':
     
     # default settings
     initialID = 1
+    N = 1000
     
     mod = 'local'
     
@@ -126,24 +127,24 @@ if __name__ == '__main__':
         deg = Degrees()
         
         if graph_statistics.getOutdeg():
-            output_rdd = deg.statistics_compute(D, 'out')
+            out_deg_rdd = deg.statistics_compute(D, 'out')
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = out_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'out_degree')
             
         if graph_statistics.getIndeg():
-            output_rdd = deg.statistics_compute(D, 'in')
+            in_deg_rdd = deg.statistics_compute(D, 'in')
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = in_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'in_degree')
             
         if graph_statistics.getTotaldge():
-            output_rdd = deg.statistics_compute(D, 'total')
+            total_deg_rdd = deg.statistics_compute(D, 'total')
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree')
             
         if graph_statistics.getTotalDeg_vs_Count():
@@ -160,15 +161,15 @@ if __name__ == '__main__':
         pr = PageRank() 
         
         if graph_statistics.getPR():
-            output_rdd = pr.statistics_compute(D, 19, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank')
             
         if graph_statistics.getPR_vs_Count():
-            pr_rdd = pr.statistics_compute(D, 19, 0.85, debug_mod)
-            [centers, counts] = pr.pr_vs_count(output_rdd, 1000)
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            [centers, counts] = pr.pr_vs_count(pr_rdd, N)
             centers = sc.parallelize(centers)
             counts = sc.parallelize(counts)
             pr_vs_count = centers.zip(counts)
@@ -179,11 +180,21 @@ if __name__ == '__main__':
             
         if graph_statistics.getTotalDeg_vs_PR():
             total_degree_rdd = deg.statistics_compute(D, 'total')
-            pr_rdd = pr.statistics_compute(D, 19, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
             total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
             
             temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr')
+            
+        if graph_statistics.getAggregateResult() == 1:
+            
+            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_min, pr_max = pr.extreme_compute(pr_rdd)
+            print(pr_min, pr_max)
+            [centers, counts] = pr.pr_vs_count(pr_rdd, N)
+            print(centers)
+            print(counts)
+            
             
             
 
@@ -194,35 +205,36 @@ if __name__ == '__main__':
         deg = Degrees()
         if graph_statistics.getOutdeg():
             print("Starts computing weighted_out degree...")
-            output_rdd = deg.statistics_compute(D_w, 'weighted_out')
-            print(output_rdd)
+            out_deg_rdd = deg.statistics_compute(D_w, 'weighted_out')
+#             print(output_rdd)
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = out_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'out_degree_weighted')
             
         if graph_statistics.getIndeg():
-            output_rdd = deg.statistics_compute(D_w, 'weighted_in')
+            in_deg_rdd = deg.statistics_compute(D_w, 'weighted_in')
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = in_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'in_degree_weighted')
            
         if graph_statistics.getTotaldge():
-            output_rdd = deg.statistics_compute(D_w, 'weighted_total')
+            total_deg_rdd = deg.statistics_compute(D_w, 'weighted_total')
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_deg_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_weighted')
             
         if graph_statistics.getTotalDeg_vs_Count():
-            [centers, counts] = deg.deg_vs_count_weight(output_rdd, 1000)
+            output_rdd = deg.statistics_compute(D, 'total')
+            [centers, counts] = deg.deg_vs_count_weight(output_rdd, N)
             centers = sc.parallelize(centers)
             counts = sc.parallelize(counts)
-            total_degree_vs_count_weighted_rdd = centers.zip(counts)
+            deg_vs_count_rdd = centers.zip(counts)
             
             # generate outputs to hdfs
-            temp = total_degree_vs_count_weighted_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = deg_vs_count_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_count_weighted')
    
         '''
@@ -231,16 +243,16 @@ if __name__ == '__main__':
         pr = PageRank() 
         
         if graph_statistics.getPR():
-            output_rdd = pr.statistics_compute_weighted(D_w, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute_weighted(D_w, 32, 0.85, debug_mod)
             
             # generate outputs to hdfs
-            temp = output_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank_weighted')
             
         
         if graph_statistics.getPR_vs_Count():
             pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
-            [centers, counts] = pr.pr_vs_count(output_rdd, 1000)
+            [centers, counts] = pr.pr_vs_count(pr_rdd, N)
             centers = sc.parallelize(centers)
             counts = sc.parallelize(counts)
             pr_vs_count = centers.zip(counts)
@@ -258,8 +270,13 @@ if __name__ == '__main__':
             temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
             
+
     
-#      
+        
+        
+        
+        
+#
 #     Edges_rdd = sc.parallelize(Edges)
 #     temp = Edges_rdd.map(lambda x: ",".join(map(str,x))).coalesce(1)
 #     temp.saveAsTextFile(output_file_path+'edges')

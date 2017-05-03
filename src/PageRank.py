@@ -41,7 +41,15 @@ class PageRank:
 
             for url in temp:
                 yield (url[0], url[1] * rank / temp_sum)
+    
+    def extreme_compute(self, D):
         
+        pr_min = D.map(lambda x: (x[1])).min()
+        pr_max = D.map(lambda x: (x[1])).max()
+        
+        return pr_min, pr_max
+    
+    
     def statistics_compute(self, D, Iter, d, debug_mod):
         max_src, max_dst = D.reduce(lambda x, y: (max(x[0], y[0]), max(x[1], y[1])))
         print(max_src, max_dst)

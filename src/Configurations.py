@@ -33,6 +33,9 @@ class Configurations:
         self._pr_vs_count = 1 # default: 1
         self._totaldeg_vs_pr = 1 # default: 1
         
+        # aggregate the result
+        self._aggregate_result = 1
+        
     def getDebug(self):
         return self._debug
     
@@ -59,4 +62,6 @@ class Configurations:
 
     def getTotalDeg_vs_PR(self):
         return self._totaldeg_vs_pr
-        
+    
+    def getAggregateResult(self):
+        return self._aggregate_result
