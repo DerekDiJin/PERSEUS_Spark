@@ -11,6 +11,7 @@ import random
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
+from pyspark.sql.functions import countDistinct
 
 import Utility as ut
 
@@ -74,6 +75,7 @@ if __name__ == '__main__':
     # default settings
     initialID = 1
     N = 1000
+    Iter = 10
     
     mod = 'local'
     
@@ -161,14 +163,14 @@ if __name__ == '__main__':
         pr = PageRank() 
         
         if graph_statistics.getPR():
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             
             # generate outputs to hdfs
             temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank')
             
         if graph_statistics.getPR_vs_Count():
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             [centers, counts] = pr.pr_vs_count(pr_rdd, N)
             centers = sc.parallelize(centers)
             counts = sc.parallelize(counts)
@@ -180,7 +182,7 @@ if __name__ == '__main__':
             
         if graph_statistics.getTotalDeg_vs_PR():
             total_degree_rdd = deg.statistics_compute(D, 'total')
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
             
             temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
@@ -188,12 +190,43 @@ if __name__ == '__main__':
             
         if graph_statistics.getAggregateResult() == 1:
             
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            total_degree_rdd = deg.statistics_compute(D, 'total')
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
+            
+            deg_min, deg_max = deg.extreme_compute(total_degree_rdd)
             pr_min, pr_max = pr.extreme_compute(pr_rdd)
-            print(pr_min, pr_max)
+            
+            deg_vs_count_rdd = deg.deg_vs_count(output_rdd)
             [centers, counts] = pr.pr_vs_count(pr_rdd, N)
-            print(centers)
-            print(counts)
+            centers_rdd = sc.parallelize(centers)
+            counts_rdd = sc.parallelize(counts)
+            pr_vs_count = centers_rdd.zip(counts_rdd)
+            
+#            nodeid | degree -> nodeid | degree | pr -> degree | pr -> -> degree | pr | count -> \\  
+#            pr | degree | count -> pr | degree | count | pr_t -> \\
+#            pr_t | pr | degree | count -> pr_t | [ pr | degree | count || pr_t_count] -> degree | count | pr_t | pr_t_count \\
+#            
+            combined_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: (x[1][0], x[1][1])).join(deg_vs_count_rdd)       \
+                .map(lambda x: (x[1][0], (x[0], x[1][1]))).map( lambda x: ( x[0], (x[1][0], x[1][1], pr.findIndex(x[0], pr_min, pr_max, N, centers)) ) )       \
+                .map(lambda x: (x[1][2], (x[0], x[1][0], x[1][1]))).join(pr_vs_count).map( lambda x: (x[1][0][1], x[1][0][2], x[0], x[1][1]) )
+
+#            degree | count | pr_t | pr_t_count -> degree | pr_t | dp_count -> \\
+#            degree | count | pr_t | pr_t_count -> degree | pr_t || count | pr_t_count | dp_count -> degree | pr_t | dp_count | degree | count | 1 | pr_t | pr_t_count | 1 
+            deg_pr_c_rdd = combined_rdd.groupBy(lambda x: (x[0], x[2])).map(lambda x: (x[0], len(x[1])))
+            final_rdd = combined_rdd.map( lambda x: ((x[0], x[2]), (x[1], x[3])) ).join(deg_pr_c_rdd).map( lambda x: (x[0][0], x[0][1], x[1][1], x[0][0], x[1][0][0], 1, x[0][1], x[1][0][1], 1) ).distinct()
+            ut.printRDD(final_rdd)
+#             print(deg_count_rdd)
+#             pr_count_rdd = combined_rdd.map(combined_rdd[2], combined_rdd[3])
+#             deg_pr_rdd = combined_rdd.map(combined_rdd[0], combined_rdd[2])
+            
+            temp = final_rdd.map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'combined')
+#             fOut_path = output_file_path+'combined'
+#             fOut = open(fOut_path, 'w')
+#             for key, value in combined_rdd.items():
+#                 fOut.write(str(key) + '\t' + str(value) + '\n')
+#             fOut.close()
+#                 
             
             
             
@@ -243,7 +276,7 @@ if __name__ == '__main__':
         pr = PageRank() 
         
         if graph_statistics.getPR():
-            pr_rdd = pr.statistics_compute_weighted(D_w, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute_weighted(D_w, Iter, 0.85, debug_mod)
             
             # generate outputs to hdfs
             temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
@@ -251,7 +284,7 @@ if __name__ == '__main__':
             
         
         if graph_statistics.getPR_vs_Count():
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             [centers, counts] = pr.pr_vs_count(pr_rdd, N)
             centers = sc.parallelize(centers)
             counts = sc.parallelize(counts)
@@ -264,7 +297,7 @@ if __name__ == '__main__':
         
         if graph_statistics.getTotalDeg_vs_PR():
             total_degree_rdd = deg.statistics_compute(D, 'total')
-            pr_rdd = pr.statistics_compute(D, 32, 0.85, debug_mod)
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
             
             temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)

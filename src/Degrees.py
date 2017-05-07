@@ -16,7 +16,15 @@ import Utility as ut
 class Degrees:
     
     def __init__(self):
+        
         self._descriotion = 'In degrees'
+        
+    def extreme_compute(self, D):
+        
+        deg_min = D.map(lambda x: (x[1])).min()
+        deg_max = D.map(lambda x: (x[1])).max()
+        
+        return deg_min, deg_max
         
     def statistics_compute(self, D, mod):
         

@@ -7,6 +7,7 @@ import sys
 import os
 import re
 import random
+import math
 import numpy as np
 import pyspark
 from operator import add
@@ -48,6 +49,16 @@ class PageRank:
         pr_max = D.map(lambda x: (x[1])).max()
         
         return pr_min, pr_max
+    
+    def findIndex(self, value, min_value, max_value, N, centers):
+        if value == max_value:
+            return centers[N-1]
+        else:
+            interval = max_value - min_value
+            grid = interval / N
+            index = int(math.floor( (value-min_value) / grid))
+        
+            return centers[index]
     
     
     def statistics_compute(self, D, Iter, d, debug_mod):

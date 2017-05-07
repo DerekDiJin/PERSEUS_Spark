@@ -24,7 +24,7 @@ class Configurations:
         self._weighted = 0 # default: 0
         self._deg_in = 1  # default: 1
         self._deg_out = 1  # default: 1
-        self._deg_total = 0  # default: 0
+        self._deg_total = 1  # default: 0
         
         self._pr = 1  # default: 1
         
