@@ -27,6 +27,7 @@ class Configurations:
         self._deg_total = 1  # default: 0
         
         self._pr = 1  # default: 1
+        self._svd = 1
         
         # bivariate distribution, total
         self._totaldeg_vs_count = 1 # default: 1
@@ -65,3 +66,6 @@ class Configurations:
     
     def getAggregateResult(self):
         return self._aggregate_result
+    
+    def getSVD(self):
+        return self._svd

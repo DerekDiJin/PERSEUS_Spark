@@ -10,6 +10,11 @@ import random
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
+
+from pyspark.mllib.linalg import Vectors
+from pyspark.mllib.linalg.distributed import RowMatrix
+from pyspark.mllib.feature import HashingTF
+
     
 # 
 # parse the raw data, rendering it to start with index 0
@@ -109,5 +114,31 @@ def egoProperties_by_partition(iterator, broadcastD, broadcastTotal):
  
     return results
 
-#########################################################################################
+def extendLine(x, x_max, y_max):
+    key, values = x
+    values_arr = {}
+    for e in values:
+        values_arr[e-1] = 1
+    
+    print(key, values_arr)
+    return (key, Vectors.sparse(y_max+1, values_arr))
+
+def edgelist2Adj(D, x_max, y_max):
+    
+    D_p_rdd = D.groupByKey().map(lambda x: extendLine(x, x_max, y_max)).sortByKey()
+    
+    D_p_list = []
+    counter = 0
+    for key, value in D_p_rdd.collect():
+        
+        while counter < key-1:
+            D_p_list.append(Vectors.sparse(y_max+1, {}))
+            counter = counter + 1
+            
+        D_p_list.append(value)
+        counter = counter + 1
+        
+    print(':)')
+    
+    return D_p_list
 

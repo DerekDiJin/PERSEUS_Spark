@@ -11,7 +11,9 @@ import random
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
-from pyspark.sql.functions import countDistinct
+from pyspark.mllib.linalg import Vectors
+from pyspark.mllib.linalg.distributed import RowMatrix
+from pyspark.mllib.feature import HashingTF
 
 import Utility as ut
 
@@ -19,7 +21,8 @@ from Configurations import Configurations
 
 from Degrees import Degrees
 from PageRank import PageRank
-    
+
+
 # 
 # parse the raw data, rendering it to start with index 0
 def parse_raw_lines(line):
@@ -82,7 +85,7 @@ if __name__ == '__main__':
     # setting up spark
     
     if mod == 'local':
-        os.environ["SPARK_HOME"] = "/Users/DiJin/BigData/spark-1.6.0-bin-hadoop2.6"
+        os.environ["SPARK_HOME"] = "/Users/DiJin/BigData/spark-2.1.1-bin-hadoop2.6"
         # configure the Spark environment
         sparkConf = pyspark.SparkConf().setAppName("PERSEUS_Spark")\
         .setMaster("local")
@@ -226,9 +229,6 @@ if __name__ == '__main__':
 #             for key, value in combined_rdd.items():
 #                 fOut.write(str(key) + '\t' + str(value) + '\n')
 #             fOut.close()
-#                 
-            
-            
             
 
     elif graph_statistics.isWeighted() == 1:
@@ -304,8 +304,28 @@ if __name__ == '__main__':
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
             
 
-    
+    if graph_statistics.getSVD() == 1:   
+        x_max = D.map(lambda x: x[0]).max() - 1
+        y_max = D.map(lambda x: x[1]).max() - 1
+        print (x_max, y_max)
         
+        adj_list = ut.edgelist2Adj(D, x_max, y_max)
+        adj_list_rdd = sc.parallelize(adj_list).cache()
+        
+        mat = RowMatrix(adj_list_rdd)
+        
+        # Compute the top 5 singular values and corresponding singular vectors.
+        svd = mat.computeSVD((y_max+1), computeU=True)
+        U = svd.U       # The U factor is a RowMatrix.
+        s = svd.s       # The singular values are stored in a local dense vector.
+        V = svd.V       # The V factor is a local dense matrix.
+        # $example off$
+        collected = U.rows.collect()
+        print("U factor is:")
+        for vector in collected:
+            print(vector)
+        print("Singular values are: %s" % s)
+        print("V factor is:\n%s" % V)
         
         
         
