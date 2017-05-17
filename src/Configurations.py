@@ -35,6 +35,7 @@ class Configurations:
         self._totaldeg_vs_pr = 1 # default: 1
         
         # aggregate the result
+        self._combine_result = 1
         self._aggregate_result = 1
         
     def getDebug(self):
@@ -69,3 +70,6 @@ class Configurations:
     
     def getSVD(self):
         return self._svd
+
+    def combineResult(self):
+        return self._combine_result

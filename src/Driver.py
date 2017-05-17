@@ -11,9 +11,11 @@ import random
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
+from pyspark.sql import SQLContext
+from pyspark.sql import Row
+
 from pyspark.mllib.linalg import Vectors
 from pyspark.mllib.linalg.distributed import RowMatrix
-from pyspark.mllib.feature import HashingTF
 
 import Utility as ut
 
@@ -21,7 +23,7 @@ from Configurations import Configurations
 
 from Degrees import Degrees
 from PageRank import PageRank
-
+from SVD import SVD
 
 # 
 # parse the raw data, rendering it to start with index 0
@@ -78,6 +80,7 @@ if __name__ == '__main__':
     # default settings
     initialID = 1
     N = 1000
+    v_dim = 10
     Iter = 10
     
     mod = 'local'
@@ -88,7 +91,7 @@ if __name__ == '__main__':
         os.environ["SPARK_HOME"] = "/Users/DiJin/BigData/spark-2.1.1-bin-hadoop2.6"
         # configure the Spark environment
         sparkConf = pyspark.SparkConf().setAppName("PERSEUS_Spark")\
-        .setMaster("local")
+        .setMaster("local").set("spark.executor.memory","4g").set("spark.driver.memory","2g")
 
     elif mod == 'yarn':
         os.environ['PYSPARK_PYTHON'] = '/sw/lsa/centos7/python-anaconda2/201607/bin/python'
@@ -191,44 +194,140 @@ if __name__ == '__main__':
             temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr')
             
-        if graph_statistics.getAggregateResult() == 1:
             
+        if graph_statistics.getSVD() == 1:   
+        
+            svd = SVD()
+            x_max = D.map(lambda x: x[0]).max() - 1
+            y_max = D.map(lambda x: x[1]).max() - 1
+            print (x_max, y_max)
+            
+            if x_max > y_max:
+                D = D.map(lambda x: (x[1], x[0])).cache()
+                temp = x_max
+                x_max = y_max
+                y_max = temp
+            
+            adj_list = ut.edgelist2Adj(D, x_max, y_max)
+            adj_list_rdd = sc.parallelize(adj_list).cache()
+            
+                
+            mat = RowMatrix(adj_list_rdd)
+            
+            v_dim = min(y_max+1, 10)
+            # Compute the top 5 singular values and corresponding singular vectors.
+            svd_result = svd.statistics_compute(mat, v_dim, True)
+            U = svd_result.U       # The U factor is a RowMatrix.
+            s = svd_result.s       # The singular values are stored in a local dense vector.
+            V = svd_result.V       # The V factor is a local dense matrix.
+            
+    #         ut.printRDD(U.rows)
+    
+            fOut = open(output_file_path+'S', 'w')
+            for item in s:
+                fOut.write(str(item) + '\n')
+            fOut.close()
+            
+            fOut = open(output_file_path+'V', 'w')
+            v_array = V.toArray()
+            
+            temp = []
+            id = 1
+            for ele in v_array:
+                array_cur = np.insert(ele, 0, id)
+                temp.append(array_cur.astype(float))
+                id = id + 1
+            v_array = temp
+            
+            v_tuple = tuple( map(tuple, v_array) )
+            # write to V file
+            for ele in v_array:
+                newStr = str(ele[0])
+                for e in ele[1:]:
+                    newStr = newStr + '\t' + str(e)
+                fOut.write(newStr + '\n')
+            fOut.close()
+            
+            v_tuple_rdd = sc.parallelize(v_tuple)
+#             ut.printRDD(v_tuple_rdd)
+#             id_rdd = sc.parallelize([i for i in range(1, max(x_max, y_max)+2)])
+            v_rdd = v_tuple_rdd.map(lambda l: Row(*[str(x) for x in l]))
+                    
+        
+            
+        if graph_statistics.combineResult() == 1:
+            
+            sqlContext = SQLContext(sc)
+            
+            temp = D.map(lambda x: (x[0], x[1], 1)).map(ut.toTSVLine).coalesce(1)
+            temp.saveAsTextFile(output_file_path+'edges')
+            
+            '''
+            combine true statistics
+            '''
             total_degree_rdd = deg.statistics_compute(D, 'total')
-            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
-            
-            deg_min, deg_max = deg.extreme_compute(total_degree_rdd)
-            pr_min, pr_max = pr.extreme_compute(pr_rdd)
+            total_degree_df = sqlContext.createDataFrame(total_degree_rdd, ['nodeid', 'degree'])
             
             deg_vs_count_rdd = deg.deg_vs_count(output_rdd)
+            deg_vs_count_df = sqlContext.createDataFrame(deg_vs_count_rdd, ['degree', 'count'])
+            
+            part1_df = total_degree_df.join(deg_vs_count_df, total_degree_df.degree == deg_vs_count_df.degree).drop(deg_vs_count_df.degree)
+            
+            pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
+            pr_df = sqlContext.createDataFrame(pr_rdd, ['nodeid', 'pagerank'])         
+            
             [centers, counts] = pr.pr_vs_count(pr_rdd, N)
             centers_rdd = sc.parallelize(centers)
             counts_rdd = sc.parallelize(counts)
-            pr_vs_count = centers_rdd.zip(counts_rdd)
+            pr_vs_count_rdd = centers_rdd.zip(counts_rdd)
+            pr_vs_count_df = sqlContext.createDataFrame(pr_vs_count_rdd, ['pagerank_t', 'pagerank_t_count'])
             
-#            nodeid | degree -> nodeid | degree | pr -> degree | pr -> -> degree | pr | count -> \\  
-#            pr | degree | count -> pr | degree | count | pr_t -> \\
-#            pr_t | pr | degree | count -> pr_t | [ pr | degree | count || pr_t_count] -> degree | count | pr_t | pr_t_count \\
-#            
-            combined_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: (x[1][0], x[1][1])).join(deg_vs_count_rdd)       \
-                .map(lambda x: (x[1][0], (x[0], x[1][1]))).map( lambda x: ( x[0], (x[1][0], x[1][1], pr.findIndex(x[0], pr_min, pr_max, N, centers)) ) )       \
-                .map(lambda x: (x[1][2], (x[0], x[1][0], x[1][1]))).join(pr_vs_count).map( lambda x: (x[1][0][1], x[1][0][2], x[0], x[1][1]) )
+            pr_min, pr_max = pr.extreme_compute(pr_rdd)
+            pr_pr_t_rdd = pr_rdd.map(lambda x: (x[1], pr.findIndex(x[1], pr_min, pr_max, N, centers))).distinct()
+            pr_pr_t_df = sqlContext.createDataFrame(pr_pr_t_rdd, ['pagerank', 'pagerank_t'])
+#             
+            part2_df_temp = pr_df.join(pr_pr_t_df, pr_df.pagerank == pr_pr_t_df.pagerank).drop(pr_pr_t_df.pagerank)
+            part2_df = part2_df_temp.join(pr_vs_count_df, part2_df_temp.pagerank_t == pr_vs_count_df.pagerank_t).drop(pr_vs_count_df.pagerank_t)
 
-#            degree | count | pr_t | pr_t_count -> degree | pr_t | dp_count -> \\
-#            degree | count | pr_t | pr_t_count -> degree | pr_t || count | pr_t_count | dp_count -> degree | pr_t | dp_count | degree | count | 1 | pr_t | pr_t_count | 1 
-            deg_pr_c_rdd = combined_rdd.groupBy(lambda x: (x[0], x[2])).map(lambda x: (x[0], len(x[1])))
-            final_rdd = combined_rdd.map( lambda x: ((x[0], x[2]), (x[1], x[3])) ).join(deg_pr_c_rdd).map( lambda x: (x[0][0], x[0][1], x[1][1], x[0][0], x[1][0][0], 1, x[0][1], x[1][0][1], 1) ).distinct()
-            ut.printRDD(final_rdd)
-#             print(deg_count_rdd)
-#             pr_count_rdd = combined_rdd.map(combined_rdd[2], combined_rdd[3])
-#             deg_pr_rdd = combined_rdd.map(combined_rdd[0], combined_rdd[2])
+            deg_pr_df = part1_df.join(part2_df, part1_df.nodeid == part2_df.nodeid).drop(part2_df.nodeid)
+#             deg_pr_df.show()
+#             deg_pr_df.sort("nodeid", ascending=True).coalesce(1).write.csv(output_file_path+'combined', 'overwrite')
+#             
             
-            temp = final_rdd.map(ut.toTSVLine).coalesce(1)
-            temp.saveAsTextFile(output_file_path+'combined')
-#             fOut_path = output_file_path+'combined'
-#             fOut = open(fOut_path, 'w')
-#             for key, value in combined_rdd.items():
-#                 fOut.write(str(key) + '\t' + str(value) + '\n')
-#             fOut.close()
+            v_dim_list = ['nodeid']
+            for i in xrange(v_dim):
+                v_dim_str = 'v_' + str(i+1)
+                v_dim_list.append(v_dim_str)
+ 
+            v_df = sqlContext.createDataFrame(v_rdd, v_dim_list)
+            v_df = v_df.select(v_df.nodeid.cast('int'), v_df.v_1, v_df.v_2, v_df.v_3, v_df.v_4, v_df.v_5, v_df.v_6, v_df.v_7, v_df.v_8, v_df.v_9, v_df.v_10)
+            
+            v_df = svd.addApprox(sc, v_df, v_rdd, N)
+#             v_df.show()
+#                 ut.printRDD(val_val_t_rdd)
+ 
+            all_statistics_df = deg_pr_df.join(v_df, deg_pr_df.nodeid == v_df.nodeid).drop(v_df.nodeid)
+            all_statistics_df.sort("nodeid", ascending=True).coalesce(1).write.csv(output_file_path+'combined', 'overwrite')
+#             all_statistics_df.show()
+#             
+            '''
+            aggregate true statistics for separate plots
+            '''
+            # plot 1: deg vs count
+            plot1_df = all_statistics_df.select(['degree', 'count']).distinct()
+            plot1_df.coalesce(1).write.csv(output_file_path+'/plots/deg_vs_count', 'overwrite')
+            
+            
+            plot2_df = all_statistics_df.groupby(['degree', 'pagerank_t']).count()
+            plot2_df.coalesce(1).write.csv(output_file_path+'/plots/deg_vs_pr', 'overwrite')
+            
+            plot3_df = all_statistics_df.select(['pagerank_t', 'pagerank_t_count']).distinct()
+            plot3_df.coalesce(1).write.csv(output_file_path+'/plots/pr_vs_count', 'overwrite')
+            
+#             plot4_df = all_statistics_df.groupby(['pagerank_t', 'pagerank_t_count'])
+#             plot4_df.coalesce(1).write.csv(output_file_path+'/plots/pr_vs_count', 'overwrite')
+#            
+
             
 
     elif graph_statistics.isWeighted() == 1:
@@ -304,28 +403,22 @@ if __name__ == '__main__':
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
             
 
-    if graph_statistics.getSVD() == 1:   
-        x_max = D.map(lambda x: x[0]).max() - 1
-        y_max = D.map(lambda x: x[1]).max() - 1
-        print (x_max, y_max)
+    
         
-        adj_list = ut.edgelist2Adj(D, x_max, y_max)
-        adj_list_rdd = sc.parallelize(adj_list).cache()
+#         ut.printRDD(v_array_rdd)
         
-        mat = RowMatrix(adj_list_rdd)
-        
-        # Compute the top 5 singular values and corresponding singular vectors.
-        svd = mat.computeSVD((y_max+1), computeU=True)
-        U = svd.U       # The U factor is a RowMatrix.
-        s = svd.s       # The singular values are stored in a local dense vector.
-        V = svd.V       # The V factor is a local dense matrix.
-        # $example off$
-        collected = U.rows.collect()
-        print("U factor is:")
-        for vector in collected:
-            print(vector)
-        print("Singular values are: %s" % s)
-        print("V factor is:\n%s" % V)
+#         if graph_statistics.combineResult() == 1:
+#             all_rdd = combined_rdd.map(lambda x: (x[0], (x[1], x[2], x[3], x[4]))).join(v_array_rdd).map(lambda x: (x[0], x[1][0][0], x[1][0][1], x[1][0][2], x[1][0][3], '\t'.join(str(d) for d in x[1][1])))# <<<---
+# #             ut.printRDD(all_rdd)
+#             temp = all_rdd.map(ut.toTSVLine).coalesce(1)
+#             temp.saveAsTextFile(output_file_path+'all')
+          
+#         collected = U.rows.collect()
+#         print("U factor is:")
+#         for vector in collected:
+#             print(vector)
+#         print("Singular values are: %s" % s)
+#         print("V factor is:\n%s" % V)
         
         
         

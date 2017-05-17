@@ -46,9 +46,20 @@ def map_make_col(line):
 #
 # print all the elements in an RDD
 def printRDD(input):
-#     fOut = open (outputFilePath, 'aw')
     for ele in input.collect():
         print(ele)
+
+def printRDD_n(input):
+#     fOut = open (outputFilePath, 'aw')
+    for ele in input.collect():
+        if len(ele[1]) == 1:
+            print(ele)
+        else:
+            e1_str = ele[1][0]
+            for e in ele[1][1:]:
+                e1_str = e1_str + ', '
+            e1_str = e1_str + '\n'
+            print(str(ele[0]), e1_str)
 #         fOut.write(str(ele) + '\n')
     print ("-------------------------")
 
@@ -65,7 +76,7 @@ def toCSVLine(data):
   return ','.join(str(d) for d in data)
 
 def toTSVLine(data):
-  return '\t'.join(str(d) for d in data)
+    return '\t'.join(str(d) for d in data)
 
 
 # update through SGD
@@ -120,7 +131,7 @@ def extendLine(x, x_max, y_max):
     for e in values:
         values_arr[e-1] = 1
     
-    print(key, values_arr)
+#     print(key, values_arr)
     return (key, Vectors.sparse(y_max+1, values_arr))
 
 def edgelist2Adj(D, x_max, y_max):
@@ -137,8 +148,6 @@ def edgelist2Adj(D, x_max, y_max):
             
         D_p_list.append(value)
         counter = counter + 1
-        
-    print(':)')
-    
+            
     return D_p_list
 
