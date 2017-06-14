@@ -16,6 +16,7 @@ from pyspark.sql import Row
 
 from pyspark.mllib.linalg import Vectors
 from pyspark.mllib.linalg.distributed import RowMatrix
+from matplotlib import pyplot as plt
 
 import Utility as ut
 
@@ -63,6 +64,139 @@ def map_make_col(line):
         print (item)
         res.append(item[1])
     return col_index, np.array(res)
+
+
+def plot2col(input, sc, name):
+    sqlContext = SQLContext(sc)
+    input_df = sqlContext.createDataFrame(input, ['x_val', 'y_val'])
+    
+    x_list = input_df.select(['x_val']).collect()
+    y_list = input_df.select(['y_val']).collect()
+    
+    x = [int(i.x_val) for i in x_list]
+    y = [int(i.y_val) for i in y_list]
+    
+#     print (y)
+
+    plt.figure()
+    plt.plot(x, y, "o")
+    plt.xscale('log')
+    plt.yscale('log')
+    
+    name = './' + name + '.png'
+    plt.savefig(name)
+    
+    return
+    
+#
+# print all the elements in an RDD
+def printRDD(input):
+    for ele in input.collect():
+        print(ele)
+
+def printRDD_n(input):
+#     fOut = open (outputFilePath, 'aw')
+    for ele in input.collect():
+        if len(ele[1]) == 1:
+            print(ele)
+        else:
+            e1_str = ele[1][0]
+            for e in ele[1][1:]:
+                e1_str = e1_str + ', '
+            e1_str = e1_str + '\n'
+            print(str(ele[0]), e1_str)
+#         fOut.write(str(ele) + '\n')
+    print ("-------------------------")
+
+# print all the elements in an RDD
+def printRDDList(input):
+#     fOut = open (outputFilePath, 'aw')
+    temp = input.map(lambda x: (x[0], list(x[1]))).collect()
+    for ele in temp:
+        print(ele)
+#         fOut.write(str(ele) + '\n')
+    print ("-------------------------")
+
+def toCSVLine(data):
+  return ','.join(str(d) for d in data)
+
+def toTSVLine(data):
+    return '\t'.join(str(d) for d in data)
+
+
+# update through SGD
+def egoProperties_by_partition(iterator, broadcastD, broadcastTotal):
+    node_set = set()
+    node = 0
+#     H_set = set()
+
+    for ele in iterator:
+        node = ele[0]
+        (src, dst) = ele[1]
+        node_set.add(src)
+        node_set.add(dst)
+        
+        
+    results = []
+    
+    temp = []
+    for i in node_set:
+        temp.append(i)
+        
+    
+    srcs = [0] * broadcastTotal.value
+    dsts = [0] * broadcastTotal.value
+    all = [0] * broadcastTotal.value
+#     
+    for index, item in enumerate(broadcastD.value):
+
+        if item[0] in temp:
+            srcs[index] = 1
+        if item[1] in temp:
+            dsts[index] = 1
+#     print srcs
+#     print '-----------------------------'
+#     print dsts
+
+    for i in xrange(broadcastTotal.value):
+        all[i] = srcs[i] + dsts[i]
+    
+    edgeCount = all.count(2)
+        
+    
+    results.append(('ego_edge', node, edgeCount))  
+    results.append(('ego_size', node, len(node_set)))
+
+ 
+    return results
+
+def extendLine(x, x_max, y_max):
+    key, values = x
+    values_arr = {}
+    for e in values:
+        values_arr[e-1] = 1
+    
+#     print(key, values_arr)
+    return (key, Vectors.sparse(y_max+1, values_arr))
+
+def edgelist2Adj(D, x_max, y_max):
+    
+    D_p_rdd = D.groupByKey().map(lambda x: extendLine(x, x_max, y_max)).sortByKey()
+    
+    D_p_list = []
+    counter = 0
+    for key, value in D_p_rdd.collect():
+        
+        while counter < key-1:
+            D_p_list.append(Vectors.sparse(y_max+1, {}))
+            counter = counter + 1
+            
+        D_p_list.append(value)
+        counter = counter + 1
+            
+    return D_p_list
+
+
 
 
 
@@ -138,21 +272,23 @@ if __name__ == '__main__':
             out_deg_rdd = deg.statistics_compute(D, 'out')
             
             # generate outputs to hdfs
-            temp = out_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = out_deg_rdd.map(toTSVLine).coalesce(1)
+#             print(':)')
+#             ut.printRDD(temp)
             temp.saveAsTextFile(output_file_path+'out_degree')
             
         if graph_statistics.getIndeg():
             in_deg_rdd = deg.statistics_compute(D, 'in')
             
             # generate outputs to hdfs
-            temp = in_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = in_deg_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'in_degree')
             
         if graph_statistics.getTotaldge():
             total_deg_rdd = deg.statistics_compute(D, 'total')
             
             # generate outputs to hdfs
-            temp = total_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_deg_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree')
             
         if graph_statistics.getTotalDeg_vs_Count():
@@ -160,7 +296,7 @@ if __name__ == '__main__':
             deg_vs_count_rdd = deg.deg_vs_count(output_rdd)
             
             # generate outputs to hdfs
-            temp = deg_vs_count_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = deg_vs_count_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'deg_vs_count')
             
         '''
@@ -172,7 +308,7 @@ if __name__ == '__main__':
             pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             
             # generate outputs to hdfs
-            temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = pr_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank')
             
         if graph_statistics.getPR_vs_Count():
@@ -183,7 +319,7 @@ if __name__ == '__main__':
             pr_vs_count = centers.zip(counts)
       
             # generate outputs to hdfs
-            temp = pr_vs_count.map(ut.toTSVLine).coalesce(1)
+            temp = pr_vs_count.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pr_vs_count')
             
         if graph_statistics.getTotalDeg_vs_PR():
@@ -191,7 +327,7 @@ if __name__ == '__main__':
             pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
             
-            temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_degree_vs_pr_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr')
             
             
@@ -208,7 +344,7 @@ if __name__ == '__main__':
                 x_max = y_max
                 y_max = temp
             
-            adj_list = ut.edgelist2Adj(D, x_max, y_max)
+            adj_list = edgelist2Adj(D, x_max, y_max)
             adj_list_rdd = sc.parallelize(adj_list).cache()
             
                 
@@ -259,7 +395,7 @@ if __name__ == '__main__':
             
             sqlContext = SQLContext(sc)
             
-            temp = D.map(lambda x: (x[0], x[1], 1)).map(ut.toTSVLine).coalesce(1)
+            temp = D.map(lambda x: (x[0], x[1], 1)).map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'edges')
             
             '''
@@ -268,7 +404,8 @@ if __name__ == '__main__':
             total_degree_rdd = deg.statistics_compute(D, 'total')
             total_degree_df = sqlContext.createDataFrame(total_degree_rdd, ['nodeid', 'degree'])
             
-            deg_vs_count_rdd = deg.deg_vs_count(output_rdd)
+            deg_vs_count_rdd = deg.deg_vs_count(total_degree_rdd)
+#             plot2col(deg_vs_count_rdd, sc, 'deg_vs_count_rdd')
             deg_vs_count_df = sqlContext.createDataFrame(deg_vs_count_rdd, ['degree', 'count'])
             
             part1_df = total_degree_df.join(deg_vs_count_df, total_degree_df.degree == deg_vs_count_df.degree).drop(deg_vs_count_df.degree)
@@ -324,8 +461,8 @@ if __name__ == '__main__':
             plot3_df = all_statistics_df.select(['pagerank_t', 'pagerank_t_count']).distinct()
             plot3_df.coalesce(1).write.csv(output_file_path+'/plots/pr_vs_count', 'overwrite')
             
-#             plot4_df = all_statistics_df.groupby(['pagerank_t', 'pagerank_t_count'])
-#             plot4_df.coalesce(1).write.csv(output_file_path+'/plots/pr_vs_count', 'overwrite')
+            plot4_df = all_statistics_df.select(['degree', 'count', 'pagerank_t', 'pagerank_t_count', 'v_1_t', 'v_2_t', 'v_3_t', 'v_4_t', 'v_5_t', 'v_6_t', 'v_7_t', 'v_8_t', 'v_9_t', 'v_10_t']).distinct()
+            plot4_df.coalesce(1).write.csv(output_file_path+'/plots/all', 'overwrite')
 #            
 
             
@@ -341,21 +478,21 @@ if __name__ == '__main__':
 #             print(output_rdd)
             
             # generate outputs to hdfs
-            temp = out_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = out_deg_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'out_degree_weighted')
             
         if graph_statistics.getIndeg():
             in_deg_rdd = deg.statistics_compute(D_w, 'weighted_in')
             
             # generate outputs to hdfs
-            temp = in_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = in_deg_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'in_degree_weighted')
            
         if graph_statistics.getTotaldge():
             total_deg_rdd = deg.statistics_compute(D_w, 'weighted_total')
             
             # generate outputs to hdfs
-            temp = total_deg_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_deg_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_weighted')
             
         if graph_statistics.getTotalDeg_vs_Count():
@@ -366,7 +503,7 @@ if __name__ == '__main__':
             deg_vs_count_rdd = centers.zip(counts)
             
             # generate outputs to hdfs
-            temp = deg_vs_count_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = deg_vs_count_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_count_weighted')
    
         '''
@@ -378,7 +515,7 @@ if __name__ == '__main__':
             pr_rdd = pr.statistics_compute_weighted(D_w, Iter, 0.85, debug_mod)
             
             # generate outputs to hdfs
-            temp = pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = pr_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pagerank_weighted')
             
         
@@ -390,7 +527,7 @@ if __name__ == '__main__':
             pr_vs_count = centers.zip(counts)
       
             # generate outputs to hdfs
-            temp = pr_vs_count.map(ut.toTSVLine).coalesce(1)
+            temp = pr_vs_count.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'pr_vs_count_weighted')
         
         
@@ -399,7 +536,7 @@ if __name__ == '__main__':
             pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             total_degree_vs_pr_rdd = total_degree_rdd.join(pr_rdd).map(lambda x: x[1])
             
-            temp = total_degree_vs_pr_rdd.map(ut.toTSVLine).coalesce(1)
+            temp = total_degree_vs_pr_rdd.map(toTSVLine).coalesce(1)
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
             
 

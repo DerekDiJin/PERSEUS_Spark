@@ -10,10 +10,13 @@ import random
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
+from pyspark.sql import SQLContext
+
 
 from pyspark.mllib.linalg import Vectors
 from pyspark.mllib.linalg.distributed import RowMatrix
-from pyspark.mllib.feature import HashingTF
+
+from matplotlib import pyplot as plt
 
     
 # 
@@ -43,6 +46,29 @@ def map_make_col(line):
         res.append(item[1])
     return col_index, np.array(res)
 
+
+def plot2col(input, sc, name):
+    sqlContext = SQLContext(sc)
+    input_df = sqlContext.createDataFrame(input, ['x_val', 'y_val'])
+    
+    x_list = input_df.select(['x_val']).collect()
+    y_list = input_df.select(['y_val']).collect()
+    
+    x = [int(i.x_val) for i in x_list]
+    y = [int(i.y_val) for i in y_list]
+    
+#     print (y)
+
+    plt.figure()
+    plt.plot(x, y, "o")
+    plt.xscale('log')
+    plt.yscale('log')
+    
+    name = './' + name + '.png'
+    plt.savefig(name)
+    
+    return
+    
 #
 # print all the elements in an RDD
 def printRDD(input):
