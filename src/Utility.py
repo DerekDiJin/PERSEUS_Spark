@@ -14,7 +14,7 @@ from pyspark.sql import SQLContext
 
 
 from pyspark.mllib.linalg import Vectors
-from pyspark.mllib.linalg.distributed import RowMatrix
+# from pyspark.mllib.linalg.distributed import RowMatrix
 
 # from matplotlib import pyplot as plt
 
