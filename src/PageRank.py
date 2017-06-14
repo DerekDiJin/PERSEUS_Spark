@@ -15,13 +15,7 @@ from pyspark import SparkConf, SparkContext
 
 import Utility as ut
 
-class PageRank:
-    
-    def __init__(self):
-        self._descriotion = 'In pagerank'
-
-        
-    def computeContribs(self, urls, rank):
+def computeContribs(urls, rank):
         """Calculates URL contributions to the rank of other URLs."""
         
         if urls is not None:
@@ -30,7 +24,8 @@ class PageRank:
                 yield (url, rank / num_urls)
 
                 
-    def computeContribs_weighted(self, urls_w, rank):
+    
+def computeContribs_weighted(urls_w, rank):
         """Calculates URL contributions to the rank of other URLs."""
 
         if urls_w is not None:
@@ -42,6 +37,14 @@ class PageRank:
 
             for url in temp:
                 yield (url[0], url[1] * rank / temp_sum)
+
+class PageRank:
+    
+    def __init__(self):
+        self._descriotion = 'In pagerank'
+
+        
+    
     
     def extreme_compute(self, D):
         
@@ -76,7 +79,7 @@ class PageRank:
             if debug_mod == 1:
                 print(iter)
                 ut.printRDD(D)
-            contribs = D.groupByKey().join(ranks).flatMap( lambda url_urls_rank: self.computeContribs(url_urls_rank[1][0], url_urls_rank[1][1]) )
+            contribs = D.groupByKey().join(ranks).flatMap( lambda url_urls_rank: computeContribs(url_urls_rank[1][0], url_urls_rank[1][1]) )
             contribs = contribs.union(src_only)
 
             if debug_mod == 1:
@@ -108,7 +111,7 @@ class PageRank:
             if debug_mod == 1:
                 print(iter)
                 ut.printRDD(D)
-            contribs = D.groupByKey().join(ranks).flatMap(lambda url_urls_rank: self.computeContribs_weighted(url_urls_rank[1][0], url_urls_rank[1][1]))
+            contribs = D.groupByKey().join(ranks).flatMap(lambda url_urls_rank: computeContribs_weighted(url_urls_rank[1][0], url_urls_rank[1][1]))
             contribs = contribs.union(src_only)
             
             if debug_mod == 1:

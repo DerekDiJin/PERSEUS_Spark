@@ -19,6 +19,17 @@ from pyspark.mllib.linalg.distributed import RowMatrix
 
 import Utility as ut
     
+
+def findIndex(value, min_value, max_value, N, centers):
+        if value == max_value:
+            return centers[N-1]
+        else:
+            interval = max_value - min_value
+            grid = interval / N
+            index = int(math.floor( (value-min_value) / grid))
+        
+            return centers[index]
+
 class SVD:
     
     def __init__(self):
@@ -42,19 +53,11 @@ class SVD:
             curCol = values.map(lambda x: x[i])
             [centers, counts] = self.prox(curCol, N)
             
-            result_rdd = result_rdd.join(curCol.map(lambda x: self.findIndex(x, )))
+            result_rdd = result_rdd.join(curCol.map(lambda x: findIndex(x, )))
             
         return
     
-    def findIndex(self, value, min_value, max_value, N, centers):
-        if value == max_value:
-            return centers[N-1]
-        else:
-            interval = max_value - min_value
-            grid = interval / N
-            index = int(math.floor( (value-min_value) / grid))
-        
-            return centers[index]
+    
     
     def linkProx(self, v_tuple_rdd, index, N):
         curCol_rdd = v_tuple_rdd.map(lambda x: float(x[index]))
@@ -62,7 +65,7 @@ class SVD:
         
         val_min = curCol_rdd.min()
         val_max = curCol_rdd.max()
-        val_val_t_rdd = curCol_rdd.map(lambda x: (x, self.findIndex(x, val_min, val_max, N, centers))).distinct()
+        val_val_t_rdd = curCol_rdd.map(lambda x: (x, findIndex(x, val_min, val_max, N, centers))).distinct()
     
         return val_val_t_rdd
     
