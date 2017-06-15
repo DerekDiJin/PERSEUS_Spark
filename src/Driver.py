@@ -227,12 +227,12 @@ if __name__ == '__main__':
             
     #         ut.printRDD(U.rows)
     
-            fOut = open(output_file_path+'S', 'w')
-            for item in s:
-                fOut.write(str(item) + '\n')
-            fOut.close()
+#  -->           fOut = open(output_file_path+'S', 'w')
+#             for item in s:
+#                 fOut.write(str(item) + '\n')
+#             fOut.close()
             
-            fOut = open(output_file_path+'V', 'w')
+#             fOut = open(output_file_path+'V', 'w')
             v_array = V.toArray()
             
             temp = []
@@ -245,12 +245,12 @@ if __name__ == '__main__':
             
             v_tuple = tuple( map(tuple, v_array) )
             # write to V file
-            for ele in v_array:
-                newStr = str(ele[0])
-                for e in ele[1:]:
-                    newStr = newStr + '\t' + str(e)
-                fOut.write(newStr + '\n')
-            fOut.close()
+#  -->           for ele in v_array:
+#                 newStr = str(ele[0])
+#                 for e in ele[1:]:
+#                     newStr = newStr + '\t' + str(e)
+#                 fOut.write(newStr + '\n')
+#             fOut.close()
             
             v_tuple_rdd = sc.parallelize(v_tuple)
 #             ut.printRDD(v_tuple_rdd)
