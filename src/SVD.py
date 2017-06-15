@@ -54,7 +54,10 @@ class SVD:
         else:
             interval = max_value - min_value
             grid = interval / N
+#             print(value, max_value, min_value, grid)
             index = int(math.floor( (value-min_value) / grid))
+            if index == N:
+                index = index - 1
         
             return centers[index]
     
