@@ -14,7 +14,9 @@ from pyspark import SparkConf, SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql import Row
 
-from linalg import Vectors
+from pyspark.mllib.linalg import Vectors
+# from linalg import Vectors
+# from pyspark.mllib.linalg.distributed import RowMatrix
 from linalg.distributed import RowMatrix
 
 import Utility as ut

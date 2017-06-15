@@ -14,7 +14,8 @@ from pyspark import SparkConf, SparkContext
 from pyspark.sql import SQLContext
 from pyspark.sql import Row
 
-from linalg import Vectors
+from pyspark.mllib.linalg import Vectors
+# from linalg import Vectors
 # from pyspark.mllib.linalg.distributed import RowMatrix
 from linalg.distributed import RowMatrix
 
@@ -95,7 +96,6 @@ if __name__ == '__main__':
         # configure the Spark environment
         sparkConf = pyspark.SparkConf().setAppName("PERSEUS_Spark")\
         .setMaster("local").set("spark.executor.memory","4g").set("spark.driver.memory","2g")
-#         sparkConf.set("spark.executor.heartbeatInterval","3600s")
 
     elif mod == 'yarn':
         os.environ['PYSPARK_PYTHON'] = '/sw/lsa/centos7/python-anaconda2/201607/bin/python'
@@ -337,7 +337,7 @@ if __name__ == '__main__':
   
             all_statistics_df = deg_cc_df.join(v_df, deg_cc_df.nodeid == v_df.nodeid).drop(v_df.nodeid)
             all_statistics_df.sort("nodeid", ascending=True).coalesce(1).write.csv(output_file_path+'combined', 'overwrite')
-            all_statistics_df.show()
+#             all_statistics_df.show()
 #             
             '''
             aggregate true statistics for separate plots
