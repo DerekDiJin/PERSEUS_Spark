@@ -7,14 +7,13 @@ import sys
 import os
 import re
 import random
+import math
 import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
-from pyspark.sql import SQLContext
-
 
 from pyspark.mllib.linalg import Vectors
-# from pyspark.mllib.linalg.distributed import RowMatrix
+from pyspark.mllib.linalg.distributed import RowMatrix
 
 # from matplotlib import pyplot as plt
 
@@ -176,4 +175,22 @@ def edgelist2Adj(D, x_max, y_max):
         counter = counter + 1
             
     return D_p_list
+
+def findIndex(value, min_value, max_value, N, centers):
+    if value == max_value:
+        return centers[N-1]
+    else:
+        interval = max_value - min_value
+        grid = interval / N
+        index = int(math.floor( (value-min_value) / grid))
+        if index >= N-1:
+            index = N-1
+        return centers[index]
+
+def binCenter(binBoundary):
+    length = len(binBoundary)
+    centers = [0] * (length-1)
+    for idx in range(len(centers)):
+        centers[idx] = binBoundary[idx] + (binBoundary[idx+1] - binBoundary[idx])/2.0
+    return centers
 

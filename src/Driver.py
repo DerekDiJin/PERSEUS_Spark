@@ -26,6 +26,7 @@ from Configurations import Configurations
 from Degrees import Degrees
 from PageRank import PageRank
 from SVD import SVD
+from ClusteringCoefficient import ClusteringCoefficient
 
 # 
 # parse the raw data, rendering it to start with index 0
@@ -267,15 +268,16 @@ if __name__ == '__main__':
             '''
             combine true statistics
             '''
+            """ degree """
             total_degree_rdd = deg.statistics_compute(D, 'total')
             total_degree_df = sqlContext.createDataFrame(total_degree_rdd, ['nodeid', 'degree'])
             
             deg_vs_count_rdd = deg.deg_vs_count(total_degree_rdd)
-#             ut.plot2col(deg_vs_count_rdd, sc, 'deg_vs_count_rdd')
             deg_vs_count_df = sqlContext.createDataFrame(deg_vs_count_rdd, ['degree', 'count'])
             
             part1_df = total_degree_df.join(deg_vs_count_df, total_degree_df.degree == deg_vs_count_df.degree).drop(deg_vs_count_df.degree)
-            
+
+            """ pagerank """
             pr_rdd = pr.statistics_compute(D, Iter, 0.85, debug_mod)
             pr_df = sqlContext.createDataFrame(pr_rdd, ['nodeid', 'pagerank'])         
             
@@ -296,20 +298,43 @@ if __name__ == '__main__':
 #             deg_pr_df.show()
 #             deg_pr_df.sort("nodeid", ascending=True).coalesce(1).write.csv(output_file_path+'combined', 'overwrite')
 #             
+
+            """ cluster coeff """
+            cc = ClusteringCoefficient()
+            cc_rdd, acc = cc.ccfinding(D)
+            cc_min, cc_max = cc.extreme_compute(cc_rdd)
+            [centers, counts] = cc.cc_vs_count(cc_rdd, N)
+            centers_rdd = sc.parallelize(centers)
+            counts_rdd = sc.parallelize(counts)
+            cc_vs_count = centers_rdd.zip(counts_rdd)
+            cc_df = sqlContext.createDataFrame(cc_rdd, ['nodeid', 'clusCoeff'])
+            # cc_df.show()
+            cc_vs_cnt_df = sqlContext.createDataFrame(cc_vs_count, ['clusCoeff_t', 'cc_t_count'])
+            # cc_vs_cnt_df.show()
+            cc_cc_t_rdd = cc_rdd.map(lambda x: (x[1], ut.findIndex(x[1],cc_min,cc_max,N,centers))).distinct()
+            cc_cc_t_df = sqlContext.createDataFrame(cc_cc_t_rdd, ['clusCoeff', 'clusCoeff_t'])
+
+            part3_df_temp = cc_df.join(cc_cc_t_df, cc_df.clusCoeff == cc_cc_t_df.clusCoeff).drop(cc_cc_t_df.clusCoeff)
+            part3_df = part3_df_temp.join(cc_vs_cnt_df, part3_df_temp.clusCoeff_t == cc_vs_cnt_df.clusCoeff_t).drop(cc_vs_cnt_df.clusCoeff_t)
             
+            """ degree + pagerank + cluster coeff """
+            deg_cc_df = deg_pr_df.join(part3_df, deg_pr_df.nodeid == part3_df.nodeid).drop(part3_df.nodeid)
+#             deg_cc_df.show()
+            
+            """ SVD """
             v_dim_list = ['nodeid']
             for i in xrange(v_dim):
                 v_dim_str = 'v_' + str(i+1)
                 v_dim_list.append(v_dim_str)
- 
+  
             v_df = sqlContext.createDataFrame(v_rdd, v_dim_list)
             v_df = v_df.select(v_df.nodeid.cast('int'), v_df.v_1, v_df.v_2, v_df.v_3, v_df.v_4, v_df.v_5, v_df.v_6, v_df.v_7, v_df.v_8, v_df.v_9, v_df.v_10)
-            
+             
             v_df = svd.addApprox(sc, v_df, v_rdd, N)
 #             v_df.show()
 #                 ut.printRDD(val_val_t_rdd)
- 
-            all_statistics_df = deg_pr_df.join(v_df, deg_pr_df.nodeid == v_df.nodeid).drop(v_df.nodeid)
+  
+            all_statistics_df = deg_cc_df.join(v_df, deg_cc_df.nodeid == v_df.nodeid).drop(v_df.nodeid)
             all_statistics_df.sort("nodeid", ascending=True).coalesce(1).write.csv(output_file_path+'combined', 'overwrite')
 #             all_statistics_df.show()
 #             
@@ -319,15 +344,15 @@ if __name__ == '__main__':
             # plot 1: deg vs count
             plot1_df = all_statistics_df.select(['degree', 'count']).distinct()
             plot1_df.coalesce(1).write.csv(output_file_path+'/plots/deg_vs_count', 'overwrite')
-            
-            
+             
+             
             plot2_df = all_statistics_df.groupby(['degree', 'pagerank_t']).count()
             plot2_df.coalesce(1).write.csv(output_file_path+'/plots/deg_vs_pr', 'overwrite')
-            
+             
             plot3_df = all_statistics_df.select(['pagerank_t', 'pagerank_t_count']).distinct()
             plot3_df.coalesce(1).write.csv(output_file_path+'/plots/pr_vs_count', 'overwrite')
-            
-            plot4_df = all_statistics_df.select(['degree', 'count', 'pagerank_t', 'pagerank_t_count', 'v_1_t', 'v_2_t', 'v_3_t', 'v_4_t', 'v_5_t', 'v_6_t', 'v_7_t', 'v_8_t', 'v_9_t', 'v_10_t']).distinct()
+             
+            plot4_df = all_statistics_df.select(['degree', 'count', 'pagerank_t', 'pagerank_t_count', 'clusCoeff_t', 'cc_t_count', 'v_1_t', 'v_2_t', 'v_3_t', 'v_4_t', 'v_5_t', 'v_6_t', 'v_7_t', 'v_8_t', 'v_9_t', 'v_10_t']).distinct()
             plot4_df.coalesce(1).write.csv(output_file_path+'/plots/all', 'overwrite')
 #            
 
