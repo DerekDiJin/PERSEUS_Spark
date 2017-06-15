@@ -12,8 +12,8 @@ import numpy as np
 import pyspark
 from pyspark import SparkConf, SparkContext
 
-from pyspark.mllib.linalg import Vectors
-from pyspark.mllib.linalg.distributed import RowMatrix
+from linalg import Vectors
+from linalg.distributed import RowMatrix
 
 # from matplotlib import pyplot as plt
 

@@ -42,7 +42,7 @@ class ClusteringCoefficient:
         :inData: input src-dst edge data pair
         :return: RDD object in FONL structure
         """
-        inData = inData.union(inData.map(lambda x: (x[1],x[0]))).distinct()
+#        inData = inData.union(inData.map(lambda x: (x[1],x[0]))).distinct()
 
         nodeNbor_deg = inData.groupByKey().flatMap(lambda nodeNbor: self.appendDeg(nodeNbor[0],nodeNbor[1])).groupByKey()
 
@@ -89,6 +89,7 @@ class ClusteringCoefficient:
         """ Calculate FONL structure """
         num = inData.flatMap(lambda x: (x[0], x[1])).max()
         print("num of nodes is " + str(num))
+        inData = inData.union(inData.map(lambda x: (x[1],x[0]))).distinct()
         fonlRDD = self.constructFonl(inData).cache()
 #        ut.printRDD(fonlRDD)
 
@@ -106,11 +107,16 @@ class ClusteringCoefficient:
 #        print("triRDD")
 #        ut.printRDD(triRDD)
 
+        zero_lcc = inData.subtractByKey(triRDD).map(lambda x: (x[0], 0.0))
+#        print("zero_lcc")
+#        ut.printRDD(zero_lcc)
+
         """ Calculate the denuminator of each node """
         denum = fonlRDD.map(lambda x: (x[0], 0.5*x[1]*(x[1]-1)))
 
         """ Calculate local clustering coefficient for each node """
         lccRDD = triRDD.join(denum).map(lambda x: (x[0], x[1][0]/x[1][1]))
+        lccRDD = lccRDD.union(zero_lcc).distinct()
 #         print("local clustering coefficient for each node is:")
 #         ut.printRDD(lccRDD)
         acc = lccRDD.map(lambda x: x[1]).sum()/num
@@ -119,14 +125,14 @@ class ClusteringCoefficient:
 #         ut.printRDD(Nodes)
         lccRDD = lccRDD.union(Nodes).distinct().sortByKey()
 #         ut.printRDD(lccRDD)
-        
+
         return lccRDD, acc
 
     def extreme_compute(self, lccRDD):
-        
+
         cc_min = lccRDD.map(lambda x: (x[1])).min()
         cc_max = lccRDD.map(lambda x: (x[1])).max()
-        
+
         return cc_min, cc_max
 
 #    def findIndex(self, value, min_value, max_value, N, centers):
@@ -153,5 +159,5 @@ class ClusteringCoefficient:
         centers = ut.binCenter(histList[0])
         return [centers, histList[1]]
 
-    
+
 
