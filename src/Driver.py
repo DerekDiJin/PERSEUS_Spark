@@ -99,7 +99,8 @@ if __name__ == '__main__':
 
     elif mod == 'yarn':
         os.environ['PYSPARK_PYTHON'] = '/sw/lsa/centos7/python-anaconda2/201607/bin/python'
-        sparkConf = pyspark.SparkConf().setAppName("LP").setMaster("yarn-client").set("spark.executor.memory","4g").set("spark.driver.memory","2g")
+        sparkConf = pyspark.SparkConf().setAppName("LP").setMaster("yarn-client")\
+        .set("spark.executor.memory","4g").set("spark.driver.memory","2g").set("spark.yarn.executor.memoryOverhead", "1g")
         sparkConf.set("spark.executor.heartbeatInterval","3600s")
     #     .setMaster("local")                                                            # <<<---
         
