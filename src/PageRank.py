@@ -57,7 +57,8 @@ class PageRank:
             interval = max_value - min_value
             grid = interval / N
             index = int(math.floor( (value-min_value) / grid))
-            index = 0 if index < 0 else index
+            if index < 0:
+                index = 0
         
             return centers[index]
     
