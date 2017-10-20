@@ -87,7 +87,7 @@ if __name__ == '__main__':
     v_dim = 10
     Iter = 10
     
-    mod = 'local'
+    mod = 'yarn'
     
     # setting up spark
     

@@ -22,17 +22,17 @@ class Configurations:
 
         self._debug = 0 # default: 0
         self._weighted = 0 # default: 0
-        self._deg_in = 1  # default: 1
-        self._deg_out = 1  # default: 1
-        self._deg_total = 1  # default: 0
+        self._deg_in = 0  # default: 1
+        self._deg_out = 0  # default: 1
+        self._deg_total = 0  # default: 0
         
-        self._pr = 1  # default: 1
+        self._pr = 0  # default: 1
         self._svd = 1
         
         # bivariate distribution, total
-        self._totaldeg_vs_count = 1 # default: 1
-        self._pr_vs_count = 1 # default: 1
-        self._totaldeg_vs_pr = 1 # default: 1
+        self._totaldeg_vs_count = 0 # default: 1
+        self._pr_vs_count = 0 # default: 1
+        self._totaldeg_vs_pr = 0 # default: 1
         
         # aggregate the result
         self._combine_result = 1
