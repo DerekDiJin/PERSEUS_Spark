@@ -98,12 +98,12 @@ if __name__ == '__main__':
         .setMaster("local").set("spark.executor.memory","4g").set("spark.driver.memory","2g")
 
     elif mod == 'yarn':
-        os.environ['PYSPARK_PYTHON'] = '/sw/lsa/centos7/python-anaconda2/201607/bin/python'
-        sparkConf = pyspark.SparkConf().setAppName("LP").setMaster("yarn-client")\
-        .set("spark.executor.memory","4g").set("spark.driver.memory","2g").set("spark.yarn.executor.memoryOverhead", "1g")
+        #os.environ['PYSPARK_PYTHON'] = '/sw/lsa/centos7/python-anaconda2/201607/bin/python'                                                                  
+        sparkConf = pyspark.SparkConf().setAppName("LP").set("spark.executor.memory","2g").set("spark.driver.memory","2g").set("spark.yarn.executor.memoryOve\
+rhead", "1g")
         sparkConf.set("spark.executor.heartbeatInterval","3600s")
-    #     .setMaster("local")                                                            # <<<---
-        
+    #     .setMaster("local")                                                            # <<<---                                                             
+
     else:
         sys.exit('mode error: only local and yarn are accepted.')
     
@@ -433,7 +433,7 @@ if __name__ == '__main__':
             temp.saveAsTextFile(output_file_path+'total_degree_vs_pr_weighted')
             
 
-    
+    sc.stop()
         
 #         ut.printRDD(v_array_rdd)
         
